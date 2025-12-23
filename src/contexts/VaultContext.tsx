@@ -1,14 +1,16 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { generateVaultId, generateVaultKey, encrypt, decrypt } from '@/lib/crypto';
+import { encrypt, decrypt } from '@/lib/crypto';
+import { generateMnemonic, mnemonicToVaultKey, mnemonicToVaultId } from '@/lib/mnemonic';
 import { saveNote, getNotesByVault, deleteNote as deleteNoteFromDB, saveVault, Note } from '@/lib/storage';
 
 interface VaultContextType {
   vaultId: string | null;
   vaultKey: string | null;
+  mnemonic: string[] | null;
   notes: DecryptedNote[];
   isLoading: boolean;
-  createVault: () => Promise<{ vaultId: string; vaultKey: string }>;
-  signIn: (vaultId: string, vaultKey: string) => Promise<boolean>;
+  createVaultWithMnemonic: (mnemonic?: string[]) => Promise<{ vaultId: string; vaultKey: string; mnemonic: string[] }>;
+  signInWithMnemonic: (mnemonic: string[]) => Promise<boolean>;
   signOut: () => void;
   createNote: () => Promise<string>;
   updateNote: (noteId: string, content: string) => Promise<void>;
@@ -28,6 +30,7 @@ const VaultContext = createContext<VaultContextType | undefined>(undefined);
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [vaultId, setVaultId] = useState<string | null>(null);
   const [vaultKey, setVaultKey] = useState<string | null>(null);
+  const [mnemonic, setMnemonic] = useState<string[] | null>(null);
   const [notes, setNotes] = useState<DecryptedNote[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -57,23 +60,29 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createVault = useCallback(async () => {
-    const newVaultId = generateVaultId();
-    const newVaultKey = await generateVaultKey();
+  const createVaultWithMnemonic = useCallback(async (providedMnemonic?: string[]) => {
+    const newMnemonic = providedMnemonic || generateMnemonic();
+    const newVaultId = await mnemonicToVaultId(newMnemonic);
+    const newVaultKey = await mnemonicToVaultKey(newMnemonic);
 
     await saveVault({ id: newVaultId, createdAt: Date.now() });
 
     setVaultId(newVaultId);
     setVaultKey(newVaultKey);
+    setMnemonic(newMnemonic);
     setNotes([]);
 
-    return { vaultId: newVaultId, vaultKey: newVaultKey };
+    return { vaultId: newVaultId, vaultKey: newVaultKey, mnemonic: newMnemonic };
   }, []);
 
-  const signIn = useCallback(async (vid: string, vkey: string) => {
+  const signInWithMnemonic = useCallback(async (mnemonicWords: string[]) => {
     try {
+      const vid = await mnemonicToVaultId(mnemonicWords);
+      const vkey = await mnemonicToVaultKey(mnemonicWords);
+      
       setVaultId(vid);
       setVaultKey(vkey);
+      setMnemonic(mnemonicWords);
       await loadNotes(vid, vkey);
       return true;
     } catch {
@@ -84,6 +93,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     setVaultId(null);
     setVaultKey(null);
+    setMnemonic(null);
     setNotes([]);
   }, []);
 
@@ -145,10 +155,11 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       value={{
         vaultId,
         vaultKey,
+        mnemonic,
         notes,
         isLoading,
-        createVault,
-        signIn,
+        createVaultWithMnemonic,
+        signInWithMnemonic,
         signOut,
         createNote,
         updateNote,
