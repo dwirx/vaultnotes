@@ -2,8 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useVault } from '@/contexts/VaultContext';
 import { Logo } from '@/components/Logo';
-import { ArrowLeft, Trash2, Check, MoreVertical } from 'lucide-react';
+import { TiptapEditor } from '@/components/TiptapEditor';
+import { ArrowLeft, Trash2, Check, MoreVertical, Code, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function NoteEditor() {
   const navigate = useNavigate();
@@ -11,11 +18,12 @@ export default function NoteEditor() {
   const { vaultId, vaultKey, getNote, updateNote, deleteNote } = useVault();
 
   const [content, setContent] = useState('');
+  const [initialContent, setInitialContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showSourceDialog, setShowSourceDialog] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,6 +36,7 @@ export default function NoteEditor() {
       const note = getNote(noteId);
       if (note) {
         setContent(note.content);
+        setInitialContent(note.content);
       }
     }
   }, [vaultId, vaultKey, noteId, getNote, navigate]);
@@ -58,8 +67,7 @@ export default function NoteEditor() {
     }
   }, [noteId, updateNote]);
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value;
+  const handleContentChange = useCallback((newContent: string) => {
     setContent(newContent);
 
     if (saveTimeoutRef.current) {
@@ -68,7 +76,7 @@ export default function NoteEditor() {
     saveTimeoutRef.current = setTimeout(() => {
       saveNote(newContent);
     }, 500);
-  };
+  }, [saveNote]);
 
   const handleDelete = async () => {
     if (!noteId) return;
@@ -81,6 +89,16 @@ export default function NoteEditor() {
       } catch {
         toast.error('Failed to delete');
       }
+    }
+  };
+
+  const handleCopyMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success('Markdown copied to clipboard');
+      setShowSourceDialog(false);
+    } catch {
+      toast.error('Failed to copy');
     }
   };
 
@@ -128,6 +146,16 @@ export default function NoteEditor() {
                     <button
                       onClick={() => {
                         setShowMenu(false);
+                        setShowSourceDialog(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Code className="h-4 w-4" />
+                      View Source
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
                         handleDelete();
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -146,23 +174,45 @@ export default function NoteEditor() {
       {/* Editor */}
       <div className="flex-1 px-4 py-4 sm:px-8 sm:py-6 md:px-16">
         <div className="max-w-4xl mx-auto h-full">
-          <textarea
-            ref={textareaRef}
-            value={content}
+          <TiptapEditor
+            content={initialContent}
             onChange={handleContentChange}
             placeholder="Start writing...
 
-Use Markdown for formatting:
-# Heading
-**bold** and *italic*
-- List items
-> Quotes"
-            className="w-full h-full min-h-[calc(100vh-120px)] bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none resize-none font-mono text-sm sm:text-base leading-relaxed"
+Use markdown shortcuts:
+# Heading 1
+## Heading 2
+- Bullet list
+1. Numbered list
+> Quote
+**bold** *italic* `code`"
             autoFocus
-            spellCheck={false}
           />
         </div>
       </div>
+
+      {/* Markdown Source Dialog */}
+      <Dialog open={showSourceDialog} onOpenChange={setShowSourceDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Markdown Source</span>
+              <button
+                onClick={handleCopyMarkdown}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-muted hover:bg-muted/80 rounded-md transition-colors"
+              >
+                <Copy className="h-4 w-4" />
+                Copy
+              </button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 overflow-auto max-h-[60vh]">
+            <pre className="bg-muted p-4 rounded-md text-sm font-mono whitespace-pre-wrap break-words">
+              {content || '(empty)'}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

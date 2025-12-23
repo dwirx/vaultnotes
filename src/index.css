@@ -121,3 +121,130 @@
     @apply bg-accent/20 text-foreground;
   }
 }
+
+
+/* Tiptap/ProseMirror Editor Styles */
+@layer components {
+  /* Remove all borders from editor wrappers - override global * border rule */
+  .tiptap,
+  .tiptap.ProseMirror,
+  .ProseMirror,
+  [data-placeholder],
+  .tiptap-editor,
+  .tiptap *,
+  .ProseMirror * {
+    border-color: transparent !important;
+    border-width: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Editor container */
+  .tiptap.ProseMirror,
+  .ProseMirror {
+    @apply min-h-[calc(100vh-120px)] text-foreground bg-transparent;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.75;
+  }
+
+  @media (min-width: 640px) {
+    .ProseMirror,
+    .tiptap.ProseMirror {
+      font-size: 1rem;
+    }
+  }
+
+  /* Placeholder */
+  .ProseMirror p.is-editor-empty:first-child::before {
+    @apply text-muted-foreground/50 pointer-events-none float-left h-0;
+    content: attr(data-placeholder);
+    white-space: pre-wrap;
+  }
+
+  /* Headings */
+  .ProseMirror h1 {
+    @apply text-2xl sm:text-3xl font-bold mt-6 mb-4 text-foreground;
+  }
+
+  .ProseMirror h2 {
+    @apply text-xl sm:text-2xl font-semibold mt-5 mb-3 text-foreground;
+  }
+
+  .ProseMirror h3 {
+    @apply text-lg sm:text-xl font-medium mt-4 mb-2 text-foreground;
+  }
+
+  /* Paragraphs */
+  .ProseMirror p {
+    @apply my-2;
+  }
+
+  /* Lists */
+  .ProseMirror ul {
+    @apply list-disc pl-6 my-3;
+  }
+
+  .ProseMirror ol {
+    @apply list-decimal pl-6 my-3;
+  }
+
+  .ProseMirror li {
+    @apply my-1;
+  }
+
+  .ProseMirror li p {
+    @apply my-0;
+  }
+
+  /* Blockquote - restore border-left */
+  .ProseMirror blockquote {
+    @apply pl-4 my-4 italic text-muted-foreground;
+    border-left-width: 4px !important;
+    border-left-color: hsl(var(--accent) / 0.5) !important;
+  }
+
+  /* Code */
+  .ProseMirror code {
+    @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-accent;
+  }
+
+  .ProseMirror pre {
+    @apply bg-muted p-4 rounded-md my-4 overflow-x-auto;
+  }
+
+  .ProseMirror pre code {
+    @apply bg-transparent p-0 text-foreground;
+  }
+
+  /* Bold & Italic */
+  .ProseMirror strong {
+    @apply font-bold;
+  }
+
+  .ProseMirror em {
+    @apply italic;
+  }
+
+  /* Strike */
+  .ProseMirror s {
+    @apply line-through text-muted-foreground;
+  }
+
+  /* Horizontal Rule - restore border */
+  .ProseMirror hr {
+    @apply my-6;
+    border-top-width: 1px !important;
+    border-top-color: hsl(var(--border)) !important;
+  }
+
+  /* Links */
+  .ProseMirror a {
+    @apply text-accent underline underline-offset-2 hover:text-accent/80;
+  }
+
+  /* Focus state */
+  .ProseMirror:focus {
+    @apply outline-none;
+  }
+}
