@@ -3,6 +3,18 @@ import { encrypt, decrypt } from '@/lib/crypto';
 import { generateMnemonic, mnemonicToVaultKey, mnemonicToVaultId } from '@/lib/mnemonic';
 import { saveNote, getNotesByVault, deleteNote as deleteNoteFromDB, saveVault, Note } from '@/lib/storage';
 
+export interface ExportedVault {
+  version: number;
+  exportedAt: string;
+  vaultId: string;
+  notes: {
+    id: string;
+    content: string;
+    createdAt: number;
+    updatedAt: number;
+  }[];
+}
+
 interface VaultContextType {
   vaultId: string | null;
   vaultKey: string | null;
@@ -16,6 +28,8 @@ interface VaultContextType {
   updateNote: (noteId: string, content: string) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
   getNote: (noteId: string) => DecryptedNote | undefined;
+  exportVault: () => ExportedVault | null;
+  importNotes: (data: ExportedVault) => Promise<{ imported: number; skipped: number }>;
 }
 
 export interface DecryptedNote {
@@ -150,6 +164,62 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     return notes.find(n => n.id === noteId);
   }, [notes]);
 
+  const exportVault = useCallback((): ExportedVault | null => {
+    if (!vaultId) return null;
+    
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      vaultId,
+      notes: notes.map(note => ({
+        id: note.id,
+        content: note.content,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+      })),
+    };
+  }, [vaultId, notes]);
+
+  const importNotes = useCallback(async (data: ExportedVault): Promise<{ imported: number; skipped: number }> => {
+    if (!vaultId || !vaultKey) throw new Error('Not signed in');
+    
+    let imported = 0;
+    let skipped = 0;
+    const existingIds = new Set(notes.map(n => n.id));
+    const newNotes: DecryptedNote[] = [];
+
+    for (const note of data.notes) {
+      // Skip if note already exists
+      if (existingIds.has(note.id)) {
+        skipped++;
+        continue;
+      }
+
+      const encryptedContent = await encrypt(note.content, vaultKey);
+      await saveNote({
+        id: note.id,
+        vaultId,
+        encryptedContent,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+      });
+
+      newNotes.push({
+        id: note.id,
+        content: note.content,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+      });
+      imported++;
+    }
+
+    if (newNotes.length > 0) {
+      setNotes(prev => [...newNotes, ...prev].sort((a, b) => b.updatedAt - a.updatedAt));
+    }
+
+    return { imported, skipped };
+  }, [vaultId, vaultKey, notes]);
+
   return (
     <VaultContext.Provider
       value={{
@@ -165,6 +235,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         updateNote,
         deleteNote: deleteNoteHandler,
         getNote,
+        exportVault,
+        importNotes,
       }}
     >
       {children}

@@ -12,6 +12,13 @@ A secure, client-side encrypted notes application with a beautiful WYSIWYG edito
 - **Zero-knowledge architecture** - Your plaintext data never leaves your device
 - **IndexedDB storage** - Encrypted data stored locally in your browser
 
+### 📤 Export & Import
+- **Export notes** - Download all your notes as a JSON file (decrypted)
+- **Import notes** - Load notes from a previously exported JSON file
+- **Drag & drop** - Simply drag a JSON file onto the import area
+- **Duplicate detection** - Automatically skips notes that already exist
+- **Cross-device sync** - Move your notes between devices easily
+
 ### ✍️ WYSIWYG Markdown Editor
 - **Live formatting** - See your formatting as you type (like Typora/Notion)
 - **Markdown shortcuts** - Type naturally with familiar shortcuts:

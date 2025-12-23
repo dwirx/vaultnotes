@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Copy, Check, Download, LogOut, ChevronDown, ChevronUp, Key } from 'lucide-react';
+import { Copy, Check, Download, LogOut, ChevronDown, ChevronUp, Key, Upload, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   copyToClipboard,
@@ -15,6 +15,8 @@ import {
   downloadTextFile,
 } from '@/lib/vault-utils';
 import { mnemonicToString } from '@/lib/mnemonic';
+import { useVault } from '@/contexts/VaultContext';
+import { ImportDialog } from './ImportDialog';
 
 interface AccountDialogProps {
   open: boolean;
@@ -33,8 +35,10 @@ export function AccountDialog({
   mnemonic,
   onSignOut,
 }: AccountDialogProps) {
+  const { exportVault, notes } = useVault();
   const [copiedMnemonic, setCopiedMnemonic] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const handleCopyMnemonic = async () => {
     if (!mnemonic) return;
@@ -56,6 +60,31 @@ export function AccountDialog({
       toast.success('Backup downloaded!');
     } catch {
       toast.error('Failed to download');
+    }
+  };
+
+  const handleExportNotes = () => {
+    try {
+      const data = exportVault();
+      if (!data) {
+        toast.error('No vault to export');
+        return;
+      }
+      
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vault-notes-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`Exported ${data.notes.length} notes`);
+    } catch {
+      toast.error('Failed to export notes');
     }
   };
 
@@ -145,6 +174,36 @@ export function AccountDialog({
               </div>
             </button>
 
+            {/* Export Notes */}
+            <button
+              onClick={handleExportNotes}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted rounded-lg text-left transition-colors"
+            >
+              <FileJson className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Export notes</p>
+                <p className="text-xs text-muted-foreground">
+                  Download all {notes.length} notes as JSON
+                </p>
+              </div>
+            </button>
+
+            {/* Import Notes */}
+            <button
+              onClick={() => setImportDialogOpen(true)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted rounded-lg text-left transition-colors"
+            >
+              <Upload className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Import notes</p>
+                <p className="text-xs text-muted-foreground">
+                  Load notes from a JSON file
+                </p>
+              </div>
+            </button>
+
+            <div className="border-t border-border my-2" />
+
             <button
               onClick={handleSignOut}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-destructive/10 rounded-lg text-left transition-colors group"
@@ -158,6 +217,9 @@ export function AccountDialog({
           </div>
         </div>
       </DialogContent>
+
+      {/* Import Dialog */}
+      <ImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </Dialog>
   );
 }
