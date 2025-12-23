@@ -3,14 +3,26 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useVault } from '@/contexts/VaultContext';
 import { Logo } from '@/components/Logo';
 import { AccountDialog } from '@/components/AccountDialog';
-import { Plus, FileText, User, Search } from 'lucide-react';
+import { Plus, FileText, User, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function Vault() {
   const navigate = useNavigate();
-  const { vaultId, vaultKey, mnemonic, notes, isLoading, createNote, signOut } = useVault();
+  const { vaultId, vaultKey, mnemonic, notes, isLoading, createNote, deleteNote, signOut } = useVault();
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     if (!vaultId || !vaultKey) {
@@ -24,6 +36,27 @@ export default function Vault() {
       navigate(`/vault/note/${noteId}`);
     } catch {
       toast.error('Failed to create note');
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, noteId: string, noteTitle: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setNoteToDelete({ id: noteId, title: noteTitle });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!noteToDelete) return;
+    
+    try {
+      await deleteNote(noteToDelete.id);
+      toast.success('Note deleted');
+    } catch {
+      toast.error('Failed to delete note');
+    } finally {
+      setDeleteDialogOpen(false);
+      setNoteToDelete(null);
     }
   };
 
@@ -144,28 +177,47 @@ export default function Vault() {
               <p className="text-muted-foreground text-sm">No notes match your search.</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredNotes.map((note) => (
-                <Link
-                  key={note.id}
-                  to={`/vault/note/${note.id}`}
-                  className="block p-4 bg-card border border-border rounded-lg hover:border-accent/50 hover:shadow-sm transition-all group"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-foreground truncate group-hover:text-accent transition-colors">
-                        {getNoteTitle(note.content)}
-                      </h3>
-                      <p className="text-muted-foreground text-sm mt-1 line-clamp-2">
-                        {getNotePreview(note.content)}
-                      </p>
+            <div className="space-y-2 sm:space-y-3">
+              {filteredNotes.map((note) => {
+                const title = getNoteTitle(note.content);
+                return (
+                  <div
+                    key={note.id}
+                    className="group bg-card border border-border rounded-lg hover:border-accent/50 hover:shadow-sm transition-all overflow-hidden"
+                  >
+                    <div className="flex items-stretch">
+                      {/* Main Content - Clickable */}
+                      <Link
+                        to={`/vault/note/${note.id}`}
+                        className="flex-1 min-w-0 p-3 sm:p-4"
+                      >
+                        <div className="flex items-start justify-between gap-2 sm:gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-foreground truncate group-hover:text-accent transition-colors text-sm sm:text-base">
+                              {title}
+                            </h3>
+                            <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2">
+                              {getNotePreview(note.content)}
+                            </p>
+                          </div>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0 mt-0.5">
+                            {formatDate(note.updatedAt)}
+                          </span>
+                        </div>
+                      </Link>
+                      
+                      {/* Delete Button - Always visible on mobile, hover on desktop */}
+                      <button
+                        onClick={(e) => handleDeleteClick(e, note.id, title)}
+                        className="flex items-center justify-center px-3 sm:px-4 border-l border-border text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all sm:opacity-0 sm:group-hover:opacity-100 active:bg-destructive/20"
+                        title="Delete note"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {formatDate(note.updatedAt)}
-                    </span>
                   </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -186,6 +238,27 @@ export default function Vault() {
         mnemonic={mnemonic}
         onSignOut={handleSignOut}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{noteToDelete?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
