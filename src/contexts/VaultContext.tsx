@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { encrypt, decrypt } from '@/lib/crypto';
 import { generateMnemonic, mnemonicToVaultKey, mnemonicToVaultId } from '@/lib/mnemonic';
-import { saveNote, getNotesByVault, deleteNote as deleteNoteFromDB, saveVault, Note } from '@/lib/storage';
+import { saveNote, getNotesByVault, deleteNote as deleteNoteFromDB, saveVault, saveSession, getSession, clearSession } from '@/lib/storage';
 
 export interface ExportedVault {
   version: number;
@@ -21,8 +21,9 @@ interface VaultContextType {
   mnemonic: string[] | null;
   notes: DecryptedNote[];
   isLoading: boolean;
-  createVaultWithMnemonic: (mnemonic?: string[]) => Promise<{ vaultId: string; vaultKey: string; mnemonic: string[] }>;
-  signInWithMnemonic: (mnemonic: string[]) => Promise<boolean>;
+  isRestoring: boolean;
+  createVaultWithMnemonic: (mnemonic?: string[], rememberMe?: boolean) => Promise<{ vaultId: string; vaultKey: string; mnemonic: string[] }>;
+  signInWithMnemonic: (mnemonic: string[], rememberMe?: boolean) => Promise<boolean>;
   signOut: () => void;
   createNote: () => Promise<string>;
   updateNote: (noteId: string, content: string) => Promise<void>;
@@ -47,6 +48,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [mnemonic, setMnemonic] = useState<string[] | null>(null);
   const [notes, setNotes] = useState<DecryptedNote[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(true);
 
   const loadNotes = useCallback(async (vid: string, vkey: string) => {
     setIsLoading(true);
@@ -74,7 +76,31 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createVaultWithMnemonic = useCallback(async (providedMnemonic?: string[]) => {
+  // Restore session on mount
+  useEffect(() => {
+    const restoreSession = async () => {
+      const session = getSession();
+      if (session) {
+        try {
+          const vid = await mnemonicToVaultId(session.mnemonic);
+          const vkey = await mnemonicToVaultKey(session.mnemonic);
+          
+          setVaultId(vid);
+          setVaultKey(vkey);
+          setMnemonic(session.mnemonic);
+          await loadNotes(vid, vkey);
+        } catch {
+          // Invalid session, clear it
+          clearSession();
+        }
+      }
+      setIsRestoring(false);
+    };
+
+    restoreSession();
+  }, [loadNotes]);
+
+  const createVaultWithMnemonic = useCallback(async (providedMnemonic?: string[], rememberMe?: boolean) => {
     const newMnemonic = providedMnemonic || generateMnemonic();
     const newVaultId = await mnemonicToVaultId(newMnemonic);
     const newVaultKey = await mnemonicToVaultKey(newMnemonic);
@@ -86,10 +112,15 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setMnemonic(newMnemonic);
     setNotes([]);
 
+    // Save session if remember me is enabled
+    if (rememberMe) {
+      saveSession(newMnemonic);
+    }
+
     return { vaultId: newVaultId, vaultKey: newVaultKey, mnemonic: newMnemonic };
   }, []);
 
-  const signInWithMnemonic = useCallback(async (mnemonicWords: string[]) => {
+  const signInWithMnemonic = useCallback(async (mnemonicWords: string[], rememberMe?: boolean) => {
     try {
       const vid = await mnemonicToVaultId(mnemonicWords);
       const vkey = await mnemonicToVaultKey(mnemonicWords);
@@ -98,6 +129,12 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setVaultKey(vkey);
       setMnemonic(mnemonicWords);
       await loadNotes(vid, vkey);
+
+      // Save session if remember me is enabled
+      if (rememberMe) {
+        saveSession(mnemonicWords);
+      }
+
       return true;
     } catch {
       return false;
@@ -109,6 +146,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setVaultKey(null);
     setMnemonic(null);
     setNotes([]);
+    clearSession();
   }, []);
 
   const createNote = useCallback(async () => {
@@ -228,6 +266,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         mnemonic,
         notes,
         isLoading,
+        isRestoring,
         createVaultWithMnemonic,
         signInWithMnemonic,
         signOut,

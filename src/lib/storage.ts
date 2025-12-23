@@ -109,3 +109,33 @@ export async function importVaultData(notes: Note[]): Promise<void> {
     await saveNote(note);
   }
 }
+
+// Session persistence for "Remember Me" feature
+const SESSION_KEY = 'leafvault_session';
+
+export interface SavedSession {
+  mnemonic: string[];
+  savedAt: number;
+}
+
+export function saveSession(mnemonic: string[]): void {
+  const session: SavedSession = {
+    mnemonic,
+    savedAt: Date.now(),
+  };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+export function getSession(): SavedSession | null {
+  try {
+    const data = localStorage.getItem(SESSION_KEY);
+    if (!data) return null;
+    return JSON.parse(data) as SavedSession;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSession(): void {
+  localStorage.removeItem(SESSION_KEY);
+}

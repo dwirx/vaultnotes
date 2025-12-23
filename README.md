@@ -11,6 +11,7 @@ A secure, client-side encrypted notes application with a beautiful WYSIWYG edito
 - **Mnemonic phrase recovery** - 12-word recovery phrase for vault access
 - **Zero-knowledge architecture** - Your plaintext data never leaves your device
 - **IndexedDB storage** - Encrypted data stored locally in your browser
+- **Remember me** - Stay logged in on trusted devices (optional)
 
 ### 📤 Export & Import
 - **Export notes** - Download all your notes as a JSON file (decrypted)

@@ -1,8 +1,32 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/Logo';
-import { Shield, Lock, Smartphone } from 'lucide-react';
+import { Shield, Lock, Smartphone, Loader2 } from 'lucide-react';
+import { useVault } from '@/contexts/VaultContext';
 
 export default function Home() {
+  const navigate = useNavigate();
+  const { vaultId, isRestoring } = useVault();
+
+  // Redirect to vault if already signed in
+  useEffect(() => {
+    if (!isRestoring && vaultId) {
+      navigate('/vault');
+    }
+  }, [vaultId, isRestoring, navigate]);
+
+  // Show loading while restoring session
+  if (isRestoring) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-background">
       {/* Hero Section */}

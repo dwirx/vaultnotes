@@ -15,6 +15,7 @@ export default function CreateVault() {
   const [copiedMnemonic, setCopiedMnemonic] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const handleGenerateMnemonic = () => {
     setMnemonic(generateMnemonic());
@@ -26,7 +27,7 @@ export default function CreateVault() {
     
     setIsCreating(true);
     try {
-      const creds = await createVaultWithMnemonic(mnemonic);
+      const creds = await createVaultWithMnemonic(mnemonic, rememberMe);
       setCredentials(creds);
       toast.success('Vault created!');
     } catch {
@@ -171,6 +172,28 @@ export default function CreateVault() {
               />
               <span className="text-sm text-foreground">
                 I have written down my recovery phrase and understand it cannot be recovered if lost.
+              </span>
+            </label>
+
+            {/* Remember Me */}
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={rememberMe}
+                onClick={() => setRememberMe(!rememberMe)}
+                className={`
+                  w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                  ${rememberMe 
+                    ? 'bg-accent border-accent' 
+                    : 'border-border hover:border-accent/50'
+                  }
+                `}
+              >
+                {rememberMe && <Check className="h-3 w-3 text-accent-foreground" />}
+              </button>
+              <span className="text-sm text-foreground group-hover:text-accent transition-colors">
+                Remember me on this device
               </span>
             </label>
 

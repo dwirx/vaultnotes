@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useVault } from '@/contexts/VaultContext';
 import { Logo } from '@/components/Logo';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateMnemonic } from '@/lib/mnemonic';
 
@@ -11,6 +11,7 @@ export default function SignIn() {
   const { signInWithMnemonic } = useVault();
   const [mnemonicWords, setMnemonicWords] = useState<string[]>(Array(12).fill(''));
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function SignIn() {
 
     setIsLoading(true);
     try {
-      const success = await signInWithMnemonic(filteredWords);
+      const success = await signInWithMnemonic(filteredWords, rememberMe);
       if (success) {
         toast.success('Welcome back!');
         navigate('/vault');
@@ -141,6 +142,28 @@ export default function SignIn() {
               Tip: You can paste all 12 words at once into any field.
             </p>
           </div>
+
+          {/* Remember Me Checkbox */}
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={rememberMe}
+              onClick={() => setRememberMe(!rememberMe)}
+              className={`
+                w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                ${rememberMe 
+                  ? 'bg-accent border-accent' 
+                  : 'border-border hover:border-accent/50'
+                }
+              `}
+            >
+              {rememberMe && <Check className="h-3 w-3 text-accent-foreground" />}
+            </button>
+            <span className="text-sm text-foreground group-hover:text-accent transition-colors">
+              Remember me on this device
+            </span>
+          </label>
 
           {/* Submit Button */}
           <button
