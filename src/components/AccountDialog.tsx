@@ -17,6 +17,7 @@ import {
 import { mnemonicToString } from '@/lib/mnemonic';
 import { useVault } from '@/contexts/VaultContext';
 import { ImportDialog } from './ImportDialog';
+import { ExportDialog } from './ExportDialog';
 
 interface AccountDialogProps {
   open: boolean;
@@ -35,10 +36,11 @@ export function AccountDialog({
   mnemonic,
   onSignOut,
 }: AccountDialogProps) {
-  const { exportVault, notes } = useVault();
+  const { notes } = useVault();
   const [copiedMnemonic, setCopiedMnemonic] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const handleCopyMnemonic = async () => {
     if (!mnemonic) return;
@@ -60,31 +62,6 @@ export function AccountDialog({
       toast.success('Backup downloaded!');
     } catch {
       toast.error('Failed to download');
-    }
-  };
-
-  const handleExportNotes = () => {
-    try {
-      const data = exportVault();
-      if (!data) {
-        toast.error('No vault to export');
-        return;
-      }
-      
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `vault-notes-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast.success(`Exported ${data.notes.length} notes`);
-    } catch {
-      toast.error('Failed to export notes');
     }
   };
 
@@ -176,7 +153,7 @@ export function AccountDialog({
 
             {/* Export Notes */}
             <button
-              onClick={handleExportNotes}
+              onClick={() => setExportDialogOpen(true)}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted rounded-lg text-left transition-colors"
             >
               <FileJson className="h-5 w-5 text-muted-foreground" />
@@ -220,6 +197,9 @@ export function AccountDialog({
 
       {/* Import Dialog */}
       <ImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
+      
+      {/* Export Dialog */}
+      <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} />
     </Dialog>
   );
 }

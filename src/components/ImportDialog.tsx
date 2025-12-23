@@ -6,22 +6,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Upload, FileJson, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileJson, CheckCircle, AlertCircle, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useVault, ExportedVault } from '@/contexts/VaultContext';
+import { decryptWithPassword } from '@/lib/crypto';
 
 interface ImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type ImportStatus = 'idle' | 'dragging' | 'processing' | 'success' | 'error';
+interface EncryptedExport {
+  version: number;
+  encrypted: true;
+  exportedAt: string;
+  data: string;
+}
+
+type ImportStatus = 'idle' | 'dragging' | 'password' | 'processing' | 'success' | 'error';
 
 export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const { importNotes } = useVault();
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [encryptedData, setEncryptedData] = useState<EncryptedExport | null>(null);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isDecrypting, setIsDecrypting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +41,10 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
     setStatus('idle');
     setResult(null);
     setErrorMessage('');
+    setEncryptedData(null);
+    setPassword('');
+    setShowPassword(false);
+    setIsDecrypting(false);
   }, []);
 
   const handleOpenChange = useCallback((isOpen: boolean) => {
@@ -38,23 +54,9 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
     onOpenChange(isOpen);
   }, [onOpenChange, resetState]);
 
-  const processImportFile = useCallback(async (file: File) => {
-    if (!file.name.endsWith('.json')) {
-      setStatus('error');
-      setErrorMessage('Please select a JSON file');
-      return;
-    }
-
+  const processPlaintextImport = useCallback(async (data: ExportedVault) => {
     setStatus('processing');
     try {
-      const text = await file.text();
-      const data = JSON.parse(text) as ExportedVault;
-      
-      // Validate structure
-      if (!data.version || !data.notes || !Array.isArray(data.notes)) {
-        throw new Error('Invalid file format');
-      }
-
       const importResult = await importNotes(data);
       setResult(importResult);
       setStatus('success');
@@ -65,15 +67,69 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
     } catch (err) {
       console.error('Import error:', err);
       setStatus('error');
-      setErrorMessage('Invalid file format. Please use a valid export file.');
+      setErrorMessage('Failed to import notes');
     }
   }, [importNotes]);
+
+  const processImportFile = useCallback(async (file: File) => {
+    if (!file.name.endsWith('.json')) {
+      setStatus('error');
+      setErrorMessage('Please select a JSON file');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      // Check if it's an encrypted export
+      if (data.encrypted === true && data.data) {
+        setEncryptedData(data as EncryptedExport);
+        setStatus('password');
+        return;
+      }
+      
+      // Validate plaintext structure
+      if (!data.version || !data.notes || !Array.isArray(data.notes)) {
+        throw new Error('Invalid file format');
+      }
+
+      await processPlaintextImport(data as ExportedVault);
+    } catch (err) {
+      console.error('Import error:', err);
+      setStatus('error');
+      setErrorMessage('Invalid file format. Please use a valid export file.');
+    }
+  }, [processPlaintextImport]);
+
+  const handleDecryptAndImport = async () => {
+    if (!encryptedData || !password) return;
+
+    setIsDecrypting(true);
+    try {
+      const decryptedJson = await decryptWithPassword(encryptedData.data, password);
+      const data = JSON.parse(decryptedJson) as ExportedVault;
+      
+      if (!data.version || !data.notes || !Array.isArray(data.notes)) {
+        throw new Error('Invalid decrypted data');
+      }
+
+      await processPlaintextImport(data);
+    } catch (err) {
+      console.error('Decryption error:', err);
+      setErrorMessage('Wrong password or corrupted file');
+    } finally {
+      setIsDecrypting(false);
+    }
+  };
 
   const handleClick = () => {
     if (status === 'success' || status === 'error') {
       resetState();
     }
-    fileInputRef.current?.click();
+    if (status !== 'password') {
+      fileInputRef.current?.click();
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +144,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (status !== 'processing') {
+    if (status !== 'processing' && status !== 'password') {
       setStatus('dragging');
     }
   }, [status]);
@@ -129,8 +185,81 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
         </DialogHeader>
 
         <div className="pt-2">
-          {/* Drop Zone */}
-          <div
+          {/* Password Entry for Encrypted Files */}
+          {status === 'password' && (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center text-center p-4">
+                <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mb-4">
+                  <Lock className="h-8 w-8 text-accent" />
+                </div>
+                <p className="text-sm font-medium text-foreground mb-1">
+                  Encrypted file detected
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Enter the password to decrypt and import
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setErrorMessage('');
+                    }}
+                    placeholder="Enter password"
+                    className="w-full bg-background border border-border rounded-md px-3 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && password) {
+                        handleDecryptAndImport();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+
+                {errorMessage && (
+                  <p className="text-xs text-destructive text-center">{errorMessage}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={resetState}
+                    className="flex-1 px-4 py-2.5 border border-border text-foreground rounded-md text-sm font-medium hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDecryptAndImport}
+                    disabled={!password || isDecrypting}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-accent-foreground rounded-md text-sm font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isDecrypting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Decrypting...
+                      </>
+                    ) : (
+                      'Decrypt & Import'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Drop Zone - only show when not in password mode */}
+          {status !== 'password' && (
+            <div
             ref={dropZoneRef}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
@@ -236,6 +365,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
               </>
             )}
           </div>
+          )}
 
           <input
             ref={fileInputRef}
@@ -246,9 +376,11 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
           />
 
           {/* Help text */}
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            Use "Export notes" to create a backup file first
-          </p>
+          {status !== 'password' && (
+            <p className="text-xs text-muted-foreground text-center mt-4">
+              Supports both encrypted and plaintext export files
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

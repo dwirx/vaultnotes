@@ -14,11 +14,12 @@ A secure, client-side encrypted notes application with a beautiful WYSIWYG edito
 - **Remember me** - Stay logged in on trusted devices (optional)
 
 ### 📤 Export & Import
-- **Export notes** - Download all your notes as a JSON file (decrypted)
-- **Import notes** - Load notes from a previously exported JSON file
+- **Encrypted export** - Password-protect your backup files with AES-256-GCM
+- **Plaintext export** - Standard JSON export for compatibility
+- **Import notes** - Load notes from encrypted or plaintext export files
 - **Drag & drop** - Simply drag a JSON file onto the import area
 - **Duplicate detection** - Automatically skips notes that already exist
-- **Cross-device sync** - Move your notes between devices easily
+- **Cross-device sync** - Move your notes between devices securely
 
 ### ✍️ WYSIWYG Markdown Editor
 - **Live formatting** - See your formatting as you type (like Typora/Notion)
